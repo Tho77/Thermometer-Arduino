@@ -1,29 +1,53 @@
+#include <ConfigManager.h>
 #include "SparkFun_Si7021_Breakout_Library.h"
 #include <Wire.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 
-const char* ssid     = "Darkhalf";
-const char* password = "";
-
 float humidity = 0;
 float temp = 0;
 
-//Create Instance of HTU21D or SI7021 temp and humidity sensor and MPL3115A2 barrometric sensor
+int counter = 0;
+
+// Generally, you should use "unsigned long" for variables that hold time
+// The value will quickly become too large for an int to store
+// Stores the last time the temp was recorded
+unsigned long previousMillis = 0;
+
+//Create Instance of SI7021 temp and humidity sensor
 Weather sensor;
+ConfigManager configManager;
+
+struct Config {
+    char endpoint[50];
+    bool useSleep;
+    int sleepSeconds;
+    
+} config;
 
 void setup() {
   Serial.begin(115200);
-  delay(60000);
 
-  // We start by connecting to a WiFi network
+  configManager.setAPName("Demo");
+  configManager.setAPFilename("/index.html");
+  configManager.addParameter("endpoint", config.endpoint, 50);
+  configManager.addParameter("useSleep", &config.useSleep);
+  configManager.addParameter("sleepSeconds", &config.sleepSeconds);
+  configManager.begin(config);
+config.sleepSeconds = 300;
+config.useSleep = false;
+/*
   Serial.print("Connecting to ");
   Serial.println(ssid);
   
   WiFi.begin(ssid, password);
-  
-  //TODO: Figure out what to do about infinite loop.
   while (WiFi.status() != WL_CONNECTED) {
+    counter++;
+    if (counter > 50) {
+      Serial.println("Problem connecting to wifi, going to sleep for 3 minutes");
+      ESP.deepSleep(180000000);      
+    }
+
     delay(500);
     Serial.print(".");
   }
@@ -31,10 +55,27 @@ void setup() {
   Serial.println("");
   Serial.print("Connected: ");  
   Serial.println(WiFi.localIP());
-
+*/
   //Initialize the I2C sensors and ping them
   sensor.begin();
+}
 
+void loop() {
+  configManager.loop();
+
+  // Check to see if it's time to record the temp.
+  // If the difference between the current time and last time we got the temp
+  // is bigger than the interval at which we want to record the temp.
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= (1000 * config.sleepSeconds)) {
+    // Update our temp record time to now
+    previousMillis = currentMillis;
+
+    recordTemp();
+  }
+}
+
+void recordTemp() {
   // Measure Relative Humidity from the Si7021
   humidity = sensor.getRH();
 
@@ -50,30 +91,30 @@ void setup() {
   Serial.println("%");
 
   HTTPClient http;
-  http.begin("http://192.168.1.10:8078/api/thermometer?tempc=" + String(temp) + "&humidity=" + String(humidity));
+  http.begin(String(config.endpoint) + "?tempc=" + String(temp) + "&humidity=" + String(humidity));
   int httpCode = http.GET();
-  if(httpCode == HTTP_CODE_OK)
-  {
-     Serial.print("HTTP response code ");
+  if(httpCode == HTTP_CODE_OK) {
+    String response = http.getString();
+
+    if (response != "" && response != "0") {
+      Serial.println(response);
+      if (response == "1") {
+        // Stop going to sleep until the value is updated using Postman
+        config.useSleep = false;
+      }
+    }
+  } else {
+     Serial.print("Error in HTTP request: ");
      Serial.println(httpCode);
-     String response = http.getString();
-     Serial.println(response);
   }
-  else
-  {
-     Serial.println("Error in HTTP request");
-  }
-   
   http.end();
 
- 
-  //Serial.println("Going into deep sleep for 20 seconds");
-  //ESP.deepSleep(20e6); // 20e6 is 20 microseconds
-  Serial.println("Going into deep sleep for 10 minutes");
-  ESP.deepSleep(600000000); // 20e6 is 20 microseconds
-}
-
-void loop() {
-  
+  if (config.useSleep) {
+    // 1,000,000 microseconds is 1 second
+    Serial.println("Going into deep sleep for " + String(config.sleepSeconds) + " seconds");
+    ESP.deepSleep(1000000 * config.sleepSeconds);
+  } else {
+    Serial.println("Waiting for " + String(config.sleepSeconds) + " seconds");
+  }
 }
 
