@@ -12,7 +12,7 @@ int counter = 0;
 // Generally, you should use "unsigned long" for variables that hold time
 // The value will quickly become too large for an int to store
 // Stores the last time the temp was recorded
-unsigned long previousMillis = 0;
+unsigned long previousMillis;
 
 //Create Instance of SI7021 temp and humidity sensor
 Weather sensor;
@@ -28,34 +28,15 @@ struct Config {
 void setup() {
   Serial.begin(115200);
 
+  previousMillis = -2000000;
+
   configManager.setAPName("Demo");
   configManager.setAPFilename("/index.html");
   configManager.addParameter("endpoint", config.endpoint, 50);
   configManager.addParameter("useSleep", &config.useSleep);
   configManager.addParameter("sleepSeconds", &config.sleepSeconds);
   configManager.begin(config);
-config.sleepSeconds = 300;
-config.useSleep = false;
-/*
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    counter++;
-    if (counter > 50) {
-      Serial.println("Problem connecting to wifi, going to sleep for 3 minutes");
-      ESP.deepSleep(180000000);      
-    }
 
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("");
-  Serial.print("Connected: ");  
-  Serial.println(WiFi.localIP());
-*/
   //Initialize the I2C sensors and ping them
   sensor.begin();
 }
@@ -67,7 +48,7 @@ void loop() {
   // If the difference between the current time and last time we got the temp
   // is bigger than the interval at which we want to record the temp.
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= (1000 * config.sleepSeconds)) {
+  if (currentMillis - previousMillis >= (config.sleepSeconds)) {
     // Update our temp record time to now
     previousMillis = currentMillis;
 
