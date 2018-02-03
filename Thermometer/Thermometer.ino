@@ -1,3 +1,6 @@
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include <ConfigManager.h>
 #include "SparkFun_Si7021_Breakout_Library.h"
 #include <Wire.h>
@@ -37,18 +40,41 @@ void setup() {
   configManager.addParameter("sleepSeconds", &config.sleepSeconds);
   configManager.begin(config);
 
+//  ArduinoOTA.setHostname("ESP-Update");
+//  ArduinoOTA.setPassword((const char *)"password");
+//  ArduinoOTA.onStart([]() {
+//    Serial.println("Starting OTA update");
+//  });
+//  ArduinoOTA.onEnd([]() {
+//    Serial.println("\nFinished OTA update");
+//  });
+//  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+//    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+//  });
+//  ArduinoOTA.onError([](ota_error_t error) {
+//    Serial.printf("Error[%u]: ", error);
+//    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+//    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+//    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+//    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+//    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+//  });
+//  ArduinoOTA.begin();
+
+
   //Initialize the I2C sensors and ping them
   sensor.begin();
 }
 
 void loop() {
   configManager.loop();
+  //ArduinoOTA.handle();
 
   // Check to see if it's time to record the temp.
   // If the difference between the current time and last time we got the temp
   // is bigger than the interval at which we want to record the temp.
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= (config.sleepSeconds)) {
+  if (currentMillis - previousMillis >= (1000 * config.sleepSeconds)) {
     // Update our temp record time to now
     previousMillis = currentMillis;
 
@@ -98,4 +124,3 @@ void recordTemp() {
     Serial.println("Waiting for " + String(config.sleepSeconds) + " seconds");
   }
 }
-
